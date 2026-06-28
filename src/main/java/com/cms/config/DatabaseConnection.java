@@ -59,10 +59,4 @@ public class DatabaseConnection {
         }
     }
 
-    /**
-     * Giữ lại phương thức trống để đảm bảo tương thích ngược với Main.java
-     */
-    public static void closeConnection() {
-        // Không cần đóng kết nối tĩnh nữa vì mỗi truy vấn sử dụng kết nối riêng độc lập
-    }
 }

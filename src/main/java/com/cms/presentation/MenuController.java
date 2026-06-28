@@ -25,20 +25,18 @@ public class MenuController {
             System.out.println("\n=============================================");
             System.out.println("  HỆ THỐNG QUẢN LÝ KHÓA HỌC VÀ HỌC VIÊN");
             System.out.println("=============================================");
-            System.out.println("[1] Đăng nhập Admin");
-            System.out.println("[2] Đăng nhập Học viên");
-            System.out.println("[3] Thoát chương trình");
+            System.out.println("[1] Đăng nhập hệ thống");
+            System.out.println("[2] Thoát chương trình");
             System.out.println("---------------------------------------------");
             
-            int choice = InputValidator.readInt(scanner, "Nhập lựa chọn của bạn: ", false);
+            int choice = InputValidator.readInt(scanner, "Nhập lựa chọn của bạn (1-2): ", false);
             switch (choice) {
-                case 1 -> adminLogin();
-                case 2 -> studentLogin();
-                case 3 -> {
+                case 1 -> login();
+                case 2 -> {
                     System.out.println("Cảm ơn bạn đã sử dụng hệ thống! Tạm biệt.");
                     return;
                 }
-                default -> System.out.println("Lựa chọn không hợp lệ! Vui lòng chọn lại (1-3).");
+                default -> System.out.println("Lựa chọn không hợp lệ! Vui lòng chọn lại (1-2).");
             }
         }
     }
@@ -47,31 +45,24 @@ public class MenuController {
     // LOGIN FUNCTIONS
     // ==========================================
 
-    private void adminLogin() {
-        System.out.println("\n--- ĐĂNG NHẬP HỆ THỐNG (ADMIN) ---");
-        String email = InputValidator.readString(scanner, "Nhập tài khoản (Email): ", false);
-        String password = InputValidator.readString(scanner, "Nhập mật khẩu: ", false);
-
-        Student admin = studentService.login(email, password);
-        if (admin != null && admin.getRole() == Role.ADMIN) {
-            System.out.println("\nĐăng nhập thành công! Chào mừng Administrator: " + admin.getName());
-            adminMenu(admin);
-        } else {
-            System.out.println("Lỗi: Tài khoản hoặc mật khẩu Admin không chính xác!");
-        }
-    }
-
-    private void studentLogin() {
-        System.out.println("\n--- ĐĂNG NHẬP HỆ THỐNG (HỌC VIÊN) ---");
+    private void login() {
+        System.out.println("\n--- ĐĂNG NHẬP HỆ THỐNG ---");
         String email = InputValidator.readString(scanner, "Nhập tài khoản (Email): ", false);
         String password = InputValidator.readString(scanner, "Nhập mật khẩu: ", false);
 
         Student student = studentService.login(email, password);
-        if (student != null && student.getRole() == Role.STUDENT) {
-            System.out.println("\nĐăng nhập thành công! Chào mừng học viên: " + student.getName());
-            studentMenu(student);
+        if (student != null) {
+            if (student.getRole() == Role.ADMIN) {
+                System.out.println("\nĐăng nhập thành công! Chào mừng Administrator: " + student.getName());
+                adminMenu(student);
+            } else if (student.getRole() == Role.STUDENT) {
+                System.out.println("\nĐăng nhập thành công! Chào mừng học viên: " + student.getName());
+                studentMenu(student);
+            } else {
+                System.out.println("Lỗi: Quyền truy cập không hợp lệ!");
+            }
         } else {
-            System.out.println("Lỗi: Tài khoản hoặc mật khẩu Học viên không chính xác!");
+            System.out.println("Lỗi: Tài khoản hoặc mật khẩu không chính xác!");
         }
     }
 

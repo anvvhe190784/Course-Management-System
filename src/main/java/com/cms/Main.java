@@ -17,8 +17,5 @@ public class Main {
             System.err.println("Vui lòng kiểm tra lại dịch vụ cơ sở dữ liệu và cấu hình kết nối.");
         }
 
-        // Close resources before shutdown
-        DatabaseConnection.closeConnection();
-
     }
 }

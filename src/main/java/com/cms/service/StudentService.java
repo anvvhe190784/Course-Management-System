@@ -12,7 +12,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class StudentService {
-    private final StudentDAO studentDAO = new StudentDAOImpl();
+    private final StudentDAO studentDAO;
+
+    public StudentService() {
+        this.studentDAO = new StudentDAOImpl();
+    }
+
+    public StudentService(StudentDAO studentDAO) {
+        this.studentDAO = studentDAO;
+    }
 
     public List<Student> getAllStudents() {
         // Exclude ADMIN role from general student lists for management purposes
@@ -64,14 +72,13 @@ public class StudentService {
     public boolean changePassword(int studentId, String oldPassword, String verificationInfo, String newPassword) {
         Student student = studentDAO.getById(studentId);
         if (student == null) {
-            return false;
+            throw new IllegalArgumentException("Học viên không tồn tại!");
         }
 
         // Verify old password
         String hashedOld = SecurityUtil.sha256(oldPassword);
         if (!student.getPassword().equals(hashedOld)) {
-            System.out.println("Lỗi: Mật khẩu cũ không chính xác!");
-            return false;
+            throw new IllegalArgumentException("Mật khẩu cũ không chính xác!");
         }
 
         // Verify email or phone (verificationInfo can match either)
@@ -79,8 +86,7 @@ public class StudentService {
                             (student.getPhone() != null && student.getPhone().equals(verificationInfo)));
         
         if (!verified) {
-            System.out.println("Lỗi: Thông tin xác thực (Email hoặc Số điện thoại) không khớp!");
-            return false;
+            throw new IllegalArgumentException("Thông tin xác thực (Email hoặc Số điện thoại) không khớp!");
         }
 
         // Hash new password and update

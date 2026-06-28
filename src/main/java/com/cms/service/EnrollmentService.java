@@ -14,8 +14,21 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class EnrollmentService {
-    private final EnrollmentDAO enrollmentDAO = new EnrollmentDAOImpl();
-    private final CourseDAO courseDAO = new CourseDAOImpl();
+    private final EnrollmentDAO enrollmentDAO;
+    private final CourseDAO courseDAO;
+    private final StudentService studentService;
+
+    public EnrollmentService() {
+        this.enrollmentDAO = new EnrollmentDAOImpl();
+        this.courseDAO = new CourseDAOImpl();
+        this.studentService = new StudentService();
+    }
+
+    public EnrollmentService(EnrollmentDAO enrollmentDAO, CourseDAO courseDAO, StudentService studentService) {
+        this.enrollmentDAO = enrollmentDAO;
+        this.courseDAO = courseDAO;
+        this.studentService = studentService;
+    }
 
     public List<Enrollment> getAllEnrollments() {
         return enrollmentDAO.getAll();
@@ -41,8 +54,7 @@ public class EnrollmentService {
         // Validate course existence
         Course course = courseDAO.getById(courseId);
         if (course == null) {
-            System.out.println("Lỗi: Mã khóa học không tồn tại!");
-            return false;
+            throw new IllegalArgumentException("Mã khóa học không tồn tại!");
         }
 
         // Validate duplicates
@@ -51,8 +63,7 @@ public class EnrollmentService {
                 .anyMatch(e -> e.getCourseId() == courseId && e.getStatus() != Status.CANCEL);
 
         if (alreadyEnrolled) {
-            System.out.println("Lỗi: Bạn đã đăng ký khóa học này rồi!");
-            return false;
+            throw new IllegalArgumentException("Bạn đã đăng ký khóa học này rồi!");
         }
 
         Enrollment enrollment = new Enrollment(studentId, courseId, Status.WAITING);
@@ -92,13 +103,11 @@ public class EnrollmentService {
                 .orElse(null);
 
         if (target == null) {
-            System.out.println("Lỗi: Bạn chưa đăng ký khóa học này!");
-            return false;
+            throw new IllegalArgumentException("Bạn chưa đăng ký khóa học này!");
         }
 
         if (target.getStatus() != Status.WAITING) {
-            System.out.println("Lỗi: Khóa học đã được duyệt hoặc từ chối, không thể hủy đăng ký!");
-            return false;
+            throw new IllegalArgumentException("Khóa học đã được duyệt hoặc từ chối, không thể hủy đăng ký!");
         }
 
         // Perform cancellation (we can update status to CANCEL or delete row.
@@ -115,11 +124,10 @@ public class EnrollmentService {
     public boolean reviewEnrollment(int enrollmentId, Status newStatus) {
         Enrollment enrollment = enrollmentDAO.getById(enrollmentId);
         if (enrollment == null) {
-            System.out.println("Lỗi: Mã đăng ký không tồn tại!");
-            return false;
+            throw new IllegalArgumentException("Mã đăng ký không tồn tại!");
         }
         if (enrollment.getStatus() != Status.WAITING) {
-            System.out.println("Cảnh báo: Đăng ký này đã được xử lý trước đó!");
+            throw new IllegalStateException("Đăng ký này đã được xử lý trước đó!");
         }
         return enrollmentDAO.updateStatus(enrollmentId, newStatus);
     }
@@ -146,8 +154,7 @@ public class EnrollmentService {
      * Thống kê tổng số học viên (role STUDENT)
      */
     public long countTotalStudents() {
-        // Handled in student service, but we can do it here too
-        return new StudentService().getAllStudents().stream().count();
+        return studentService.getAllStudents().stream().count();
     }
 
     /**

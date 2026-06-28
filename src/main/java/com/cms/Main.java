@@ -19,5 +19,6 @@ public class Main {
 
         // Close resources before shutdown
         DatabaseConnection.closeConnection();
+
     }
 }

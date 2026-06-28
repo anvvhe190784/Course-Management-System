@@ -597,10 +597,14 @@ public class MenuController {
         }
 
         if (newStatus != null) {
-            if (enrollmentService.reviewEnrollment(id, newStatus)) {
-                System.out.println("Xử lý phê duyệt thành công!");
-            } else {
-                System.out.println("Phê duyệt thất bại!");
+            try {
+                if (enrollmentService.reviewEnrollment(id, newStatus)) {
+                    System.out.println("Xử lý phê duyệt thành công!");
+                } else {
+                    System.out.println("Phê duyệt thất bại!");
+                }
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                System.out.println("Lỗi: " + e.getMessage());
             }
         } else {
             System.out.println("Đã hủy bỏ thao tác duyệt.");
@@ -713,10 +717,14 @@ public class MenuController {
         displayAllCoursesTable();
         int courseId = InputValidator.readInt(scanner, "Nhập ID khóa học muốn đăng ký: ", true);
         
-        if (enrollmentService.registerCourse(student.getId(), courseId)) {
-            System.out.println("Đăng ký khóa học thành công! Yêu cầu của bạn đang chờ duyệt.");
-        } else {
-            System.out.println("Đăng ký khóa học thất bại!");
+        try {
+            if (enrollmentService.registerCourse(student.getId(), courseId)) {
+                System.out.println("Đăng ký khóa học thành công! Yêu cầu của bạn đang chờ duyệt.");
+            } else {
+                System.out.println("Đăng ký khóa học thất bại!");
+            }
+        } catch (IllegalArgumentException e) {
+            System.out.println("Lỗi: " + e.getMessage());
         }
     }
 
@@ -772,10 +780,14 @@ public class MenuController {
 
         boolean confirm = InputValidator.confirm(scanner, "Bạn chắc chắn muốn hủy đăng ký khóa học này (Y/N)?: ");
         if (confirm) {
-            if (enrollmentService.cancelRegistration(student.getId(), courseId)) {
-                System.out.println("Hủy đăng ký khóa học thành công!");
-            } else {
-                System.out.println("Hủy đăng ký thất bại!");
+            try {
+                if (enrollmentService.cancelRegistration(student.getId(), courseId)) {
+                    System.out.println("Hủy đăng ký khóa học thành công!");
+                } else {
+                    System.out.println("Hủy đăng ký thất bại!");
+                }
+            } catch (IllegalArgumentException e) {
+                System.out.println("Lỗi: " + e.getMessage());
             }
         }
     }
@@ -791,14 +803,14 @@ public class MenuController {
             return;
         }
 
-        if (enrollmentService.registerCourse(0, 0)) { // Just double checking mock connectivity
-            // Empty body
-        }
-
-        if (studentService.changePassword(student.getId(), oldPassword, verification, newPassword)) {
-            System.out.println("Đổi mật khẩu thành công!");
-        } else {
-            System.out.println("Đổi mật khẩu thất bại! Vui lòng kiểm tra lại thông tin.");
+        try {
+            if (studentService.changePassword(student.getId(), oldPassword, verification, newPassword)) {
+                System.out.println("Đổi mật khẩu thành công!");
+            } else {
+                System.out.println("Đổi mật khẩu thất bại!");
+            }
+        } catch (IllegalArgumentException e) {
+            System.out.println("Lỗi: " + e.getMessage());
         }
     }
 

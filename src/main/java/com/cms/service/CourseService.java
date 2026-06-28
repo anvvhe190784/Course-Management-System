@@ -9,7 +9,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class CourseService {
-    private final CourseDAO courseDAO = new CourseDAOImpl();
+    private final CourseDAO courseDAO;
+
+    public CourseService() {
+        this.courseDAO = new CourseDAOImpl();
+    }
+
+    public CourseService(CourseDAO courseDAO) {
+        this.courseDAO = courseDAO;
+    }
 
     public List<Course> getAllCourses() {
         return courseDAO.getAll();

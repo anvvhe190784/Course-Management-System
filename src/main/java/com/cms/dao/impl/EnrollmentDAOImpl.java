@@ -78,12 +78,13 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
                             rs.getTimestamp("registered_at").toLocalDateTime(),
                             Status.valueOf(rs.getString("status"))
                     );
+                    Date courseCreateDate = rs.getDate("course_create_at");
                     Course c = new Course(
                             rs.getInt("course_id"),
                             rs.getString("course_name"),
                             rs.getInt("course_duration"),
                             rs.getString("course_instructor"),
-                            rs.getDate("course_create_at").toLocalDate()
+                            courseCreateDate != null ? courseCreateDate.toLocalDate() : null
                     );
                     e.setCourse(c);
                     list.add(e);
@@ -115,16 +116,18 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
                             rs.getTimestamp("registered_at").toLocalDateTime(),
                             Status.valueOf(rs.getString("status"))
                     );
+                    Date dobDate = rs.getDate("student_dob");
+                    Date createDate = rs.getDate("student_create_at");
                     Student s = new Student(
                             rs.getInt("student_id"),
                             rs.getString("student_name"),
-                            rs.getDate("student_dob").toLocalDate(),
+                            dobDate != null ? dobDate.toLocalDate() : null,
                             rs.getString("student_email"),
                             rs.getBoolean("student_sex"),
                             rs.getString("student_phone"),
                             Role.valueOf(rs.getString("student_role")),
                             null, // Do not load password for lists
-                            rs.getDate("student_create_at").toLocalDate()
+                            createDate != null ? createDate.toLocalDate() : null
                     );
                     e.setStudent(s);
                     list.add(e);
@@ -154,7 +157,9 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
 
     @Override
     public boolean updateStatus(int id, Status status) {
-        String sql = "UPDATE enrollment SET status = ? WHERE id = ?";
+        String sql = status == Status.WAITING
+                ? "UPDATE enrollment SET status = ?, registered_at = CURRENT_TIMESTAMP WHERE id = ?"
+                : "UPDATE enrollment SET status = ? WHERE id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, status.name());
@@ -181,21 +186,6 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
         }
     }
 
-    @Override
-    public boolean deleteByStudentAndCourse(int studentId, int courseId) {
-        String sql = "DELETE FROM enrollment WHERE student_id = ? AND course_id = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, studentId);
-            stmt.setInt(2, courseId);
-            int rowsAffected = stmt.executeUpdate();
-            return rowsAffected > 0;
-        } catch (SQLException e) {
-            System.err.println("Lỗi khi hủy đăng ký khóa học: " + e.getMessage());
-            return false;
-        }
-    }
-
     private Enrollment mapFullRow(ResultSet rs) throws SQLException {
         Enrollment e = new Enrollment(
                 rs.getInt("id"),
@@ -205,24 +195,27 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
                 Status.valueOf(rs.getString("status"))
         );
 
+        Date studentDob = rs.getDate("student_dob");
+        Date studentCreateAt = rs.getDate("student_create_at");
         Student s = new Student(
                 rs.getInt("student_id"),
                 rs.getString("student_name"),
-                rs.getDate("student_dob").toLocalDate(),
+                studentDob != null ? studentDob.toLocalDate() : null,
                 rs.getString("student_email"),
                 rs.getBoolean("student_sex"),
                 rs.getString("student_phone"),
                 Role.valueOf(rs.getString("student_role")),
-                rs.getString("password"),
-                rs.getDate("student_create_at").toLocalDate()
+                null, // Password is not selected and should never leak in enrollment lists
+                studentCreateAt != null ? studentCreateAt.toLocalDate() : null
         );
 
+        Date courseCreateAt = rs.getDate("course_create_at");
         Course c = new Course(
                 rs.getInt("course_id"),
                 rs.getString("course_name"),
                 rs.getInt("course_duration"),
                 rs.getString("course_instructor"),
-                rs.getDate("course_create_at").toLocalDate()
+                courseCreateAt != null ? courseCreateAt.toLocalDate() : null
         );
 
         e.setStudent(s);

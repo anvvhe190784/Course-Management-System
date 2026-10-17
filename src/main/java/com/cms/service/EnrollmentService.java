@@ -6,11 +6,15 @@ import com.cms.dao.impl.CourseDAOImpl;
 import com.cms.dao.impl.EnrollmentDAOImpl;
 import com.cms.model.Course;
 import com.cms.model.Enrollment;
+import com.cms.model.Role;
 import com.cms.model.Status;
+import com.cms.model.Student;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class EnrollmentService {
@@ -51,19 +55,35 @@ public class EnrollmentService {
      * Validates if course exists and checks for duplicates.
      */
     public boolean registerCourse(int studentId, int courseId) {
+        if (studentService != null) {
+            Student student = studentService.getStudentById(studentId);
+            if (student != null && student.getRole() != Role.STUDENT) {
+                throw new IllegalArgumentException("Tài khoản Quản trị viên không thể đăng ký khóa học!");
+            }
+        }
+
         // Validate course existence
         Course course = courseDAO.getById(courseId);
         if (course == null) {
             throw new IllegalArgumentException("Mã khóa học không tồn tại!");
         }
 
-        // Validate duplicates
+        // Validate duplicates and handle re-registration
         List<Enrollment> studentEnrollments = enrollmentDAO.getByStudentId(studentId);
-        boolean alreadyEnrolled = studentEnrollments.stream()
-                .anyMatch(e -> e.getCourseId() == courseId && e.getStatus() != Status.CANCEL);
+        Enrollment existing = studentEnrollments.stream()
+                .filter(e -> e.getCourseId() == courseId)
+                .findFirst()
+                .orElse(null);
 
-        if (alreadyEnrolled) {
-            throw new IllegalArgumentException("Bạn đã đăng ký khóa học này rồi!");
+        if (existing != null) {
+            if (existing.getStatus() == Status.WAITING) {
+                throw new IllegalArgumentException("Khóa học này đang chờ duyệt, bạn không thể đăng ký lại!");
+            }
+            if (existing.getStatus() == Status.CONFIRM) {
+                throw new IllegalArgumentException("Bạn đã tham gia khóa học này rồi!");
+            }
+            // If previous enrollment was DENIED or CANCEL, allow re-registration by resetting to WAITING
+            return enrollmentDAO.updateStatus(existing.getId(), Status.WAITING);
         }
 
         Enrollment enrollment = new Enrollment(studentId, courseId, Status.WAITING);
@@ -110,18 +130,16 @@ public class EnrollmentService {
             throw new IllegalArgumentException("Khóa học đã được duyệt hoặc từ chối, không thể hủy đăng ký!");
         }
 
-        // Perform cancellation (we can update status to CANCEL or delete row.
-        // According to DB check constraint, CANCEL is allowed, but the code says
-        // delete.
-        // Let's delete row as in the DAO definition, or update status.
-        // In DB, deleting is clean and matches the DAO method deleteByStudentAndCourse)
-        return enrollmentDAO.deleteByStudentAndCourse(studentId, courseId);
+        return enrollmentDAO.updateStatus(target.getId(), Status.CANCEL);
     }
 
     /**
      * Approve or deny enrollment request (Admin).
      */
     public boolean reviewEnrollment(int enrollmentId, Status newStatus) {
+        if (newStatus != Status.CONFIRM && newStatus != Status.DENIED) {
+            throw new IllegalArgumentException("Trạng thái phê duyệt chỉ chấp nhận CONFIRM hoặc DENIED!");
+        }
         Enrollment enrollment = enrollmentDAO.getById(enrollmentId);
         if (enrollment == null) {
             throw new IllegalArgumentException("Mã đăng ký không tồn tại!");
@@ -201,5 +219,78 @@ public class EnrollmentService {
         return counts.entrySet().stream()
                 .filter(entry -> entry.getValue() > 10)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Thuật toán gợi ý khóa học cho học viên (Bonus feature):
+     * 1. Lọc ra danh sách khóa học mà học viên CHƯA đăng ký (hoặc đã CANCEL).
+     * 2. Ưu tiên giảng viên mà học viên đã học và được CONFIRM (+5 điểm).
+     * 3. Ưu tiên thời lượng tương đồng (chênh lệch <= 15h) với thói quen học (+2 điểm).
+     * 4. Ưu tiên khóa học có độ phổ biến cao trên toàn hệ thống (+1.5 điểm / học viên CONFIRM).
+     */
+    public List<Course> getRecommendedCourses(int studentId, int limit) {
+        return getRecommendedCourses(studentId, limit, null);
+    }
+
+    public List<Course> getRecommendedCourses(int studentId, int limit, List<Course> preloadedCourses) {
+        List<Enrollment> myEnrollments = enrollmentDAO.getByStudentId(studentId);
+        Set<Integer> enrolledCourseIds = myEnrollments.stream()
+                .filter(e -> e.getStatus() != Status.CANCEL)
+                .map(Enrollment::getCourseId)
+                .collect(Collectors.toSet());
+
+        List<Course> allCourses = preloadedCourses != null ? preloadedCourses : courseDAO.getAll();
+        List<Course> candidates = allCourses.stream()
+                .filter(c -> !enrolledCourseIds.contains(c.getId()))
+                .toList();
+
+        if (candidates.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Tập hợp giảng viên học viên từng học và đã CONFIRM
+        Set<String> favoredInstructors = myEnrollments.stream()
+                .filter(e -> e.getStatus() == Status.CONFIRM && e.getCourse() != null)
+                .map(e -> e.getCourse().getInstructor().trim().toLowerCase())
+                .collect(Collectors.toSet());
+
+        // Thời lượng trung bình các khóa học viên đã được CONFIRM
+        double avgDuration = myEnrollments.stream()
+                .filter(e -> e.getStatus() == Status.CONFIRM && e.getCourse() != null)
+                .mapToInt(e -> e.getCourse().getDuration())
+                .average()
+                .orElse(45.0);
+
+        // Bản đồ độ phổ biến của từng khóa học trên toàn hệ thống
+        Map<Integer, Long> popularCourseCounts = enrollmentDAO.getAll().stream()
+                .filter(e -> e.getStatus() == Status.CONFIRM)
+                .collect(Collectors.groupingBy(Enrollment::getCourseId, Collectors.counting()));
+
+        // Sắp xếp các khóa học đề xuất theo điểm số giảm dần
+        return candidates.stream()
+                .sorted((c1, c2) -> {
+                    double score1 = computeCourseScore(c1, favoredInstructors, avgDuration, popularCourseCounts);
+                    double score2 = computeCourseScore(c2, favoredInstructors, avgDuration, popularCourseCounts);
+                    return Double.compare(score2, score1);
+                })
+                .limit(limit > 0 ? limit : 3)
+                .collect(Collectors.toList());
+    }
+
+    private double computeCourseScore(Course course, Set<String> favoredInstructors, double avgDuration, Map<Integer, Long> popularity) {
+        double score = 0.0;
+        // Trùng giảng viên yêu thích
+        if (course.getInstructor() != null && favoredInstructors.contains(course.getInstructor().trim().toLowerCase())) {
+            score += 5.0;
+        }
+        // Thời lượng tương đồng (+-15 giờ)
+        double diff = Math.abs(course.getDuration() - avgDuration);
+        if (diff <= 15.0) {
+            score += 2.0;
+        }
+        // Độ phổ biến của khóa học
+        long count = popularity.getOrDefault(course.getId(), 0L);
+        score += count * 1.5;
+        return score;
     }
 }

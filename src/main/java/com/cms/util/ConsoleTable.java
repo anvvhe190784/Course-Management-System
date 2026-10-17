@@ -1,5 +1,6 @@
 package com.cms.util;
 
+import com.cms.model.Course;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,12 +8,47 @@ public class ConsoleTable {
     private final List<String> headers = new ArrayList<>();
     private final List<List<String>> rows = new ArrayList<>();
 
+    public ConsoleTable() {
+    }
+
+    public ConsoleTable(String... headers) {
+        if (headers != null) {
+            for (String h : headers) {
+                this.headers.add(h);
+            }
+        }
+    }
+
     public void addHeader(String header) {
         headers.add(header);
     }
 
     public void addRow(List<String> row) {
         rows.add(row);
+    }
+
+    public void addRow(String... row) {
+        if (row != null) {
+            rows.add(List.of(row));
+        }
+    }
+
+    public static void printCourseTable(List<Course> courses) {
+        if (courses == null || courses.isEmpty()) {
+            System.out.println("Không có dữ liệu khóa học nào để hiển thị.");
+            return;
+        }
+        ConsoleTable table = new ConsoleTable("ID", "Tên khóa học", "Thời lượng (Giờ)", "Giảng viên", "Ngày tạo");
+        for (Course c : courses) {
+            table.addRow(
+                    String.valueOf(c.getId()),
+                    c.getName(),
+                    String.valueOf(c.getDuration()),
+                    c.getInstructor(),
+                    c.getCreateAt() != null ? c.getCreateAt().toString() : "N/A"
+            );
+        }
+        table.print();
     }
 
     public void print() {

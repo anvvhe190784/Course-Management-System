@@ -14,12 +14,24 @@ public class StudentDAOImpl implements StudentDAO {
     @Override
     public List<Student> getAll() {
         List<Student> students = new ArrayList<>();
-        String sql = "SELECT id, name, dob, email, sex, phone, role, password, create_at FROM student";
+        String sql = "SELECT id, name, dob, email, sex, phone, role, create_at FROM student";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
-                Student student = mapRow(rs);
+                Date dobDate = rs.getDate("dob");
+                Date createDate = rs.getDate("create_at");
+                Student student = new Student(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        dobDate != null ? dobDate.toLocalDate() : null,
+                        rs.getString("email"),
+                        rs.getBoolean("sex"),
+                        rs.getString("phone"),
+                        Role.valueOf(rs.getString("role")),
+                        null,
+                        createDate != null ? createDate.toLocalDate() : null
+                );
                 students.add(student);
             }
         } catch (SQLException e) {

@@ -34,20 +34,32 @@ public class StudentService {
     }
 
     public boolean addStudent(String name, LocalDate dob, String email, boolean sex, String phone, String password) {
-        // Automatically hash password in SHA-256 before inserting
-        String hashedPassword = SecurityUtil.sha256(password);
+        String hashedPassword = SecurityUtil.hashPassword(password);
         Student student = new Student(name, dob, email, sex, phone, Role.STUDENT, hashedPassword);
         return studentDAO.insert(student);
     }
 
     public boolean updateStudent(Student student) {
-        // If password is changed, it should already be hashed or we hash it here if it's plain text.
-        // In our app, editing password will go through a specific change password logic, or we hash it.
-        // Let's assume the password is saved as is, so if the user updates password in edit, it should be hashed.
+        if (student == null || student.getRole() == Role.ADMIN) {
+            return false;
+        }
+        Student existing = studentDAO.getById(student.getId());
+        if (existing != null) {
+            if (existing.getRole() == Role.ADMIN) {
+                return false;
+            }
+            if (student.getPassword() == null) {
+                student.setPassword(existing.getPassword());
+            }
+        }
         return studentDAO.update(student);
     }
 
     public boolean deleteStudent(int id) {
+        Student existing = studentDAO.getById(id);
+        if (existing == null || existing.getRole() == Role.ADMIN) {
+            return false;
+        }
         return studentDAO.delete(id);
     }
 
@@ -56,12 +68,12 @@ public class StudentService {
      * Compares email/username and SHA-256 hashed password.
      */
     public Student login(String usernameOrEmail, String password) {
+        if (usernameOrEmail == null || password == null) {
+            return null;
+        }
         Student user = studentDAO.getByEmail(usernameOrEmail);
-        if (user != null) {
-            String hashedInput = SecurityUtil.sha256(password);
-            if (user.getPassword().equals(hashedInput)) {
-                return user;
-            }
+        if (user != null && SecurityUtil.verifyPassword(password, user.getPassword())) {
+            return user;
         }
         return null;
     }
@@ -76,8 +88,7 @@ public class StudentService {
         }
 
         // Verify old password
-        String hashedOld = SecurityUtil.sha256(oldPassword);
-        if (!student.getPassword().equals(hashedOld)) {
+        if (!SecurityUtil.verifyPassword(oldPassword, student.getPassword())) {
             throw new IllegalArgumentException("Mật khẩu cũ không chính xác!");
         }
 
@@ -90,7 +101,7 @@ public class StudentService {
         }
 
         // Hash new password and update
-        student.setPassword(SecurityUtil.sha256(newPassword));
+        student.setPassword(SecurityUtil.hashPassword(newPassword));
         return studentDAO.update(student);
     }
 

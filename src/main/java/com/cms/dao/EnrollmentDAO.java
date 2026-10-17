@@ -12,5 +12,4 @@ public interface EnrollmentDAO {
     boolean insert(Enrollment enrollment);
     boolean updateStatus(int id, Status status);
     boolean delete(int id);
-    boolean deleteByStudentAndCourse(int studentId, int courseId);
 }
